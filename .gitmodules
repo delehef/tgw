@@ -1,0 +1,3 @@
+[submodule "lagrange-protobuf"]
+	path = lagrange-protobuf
+	url = git@github.com:Lagrange-Labs/lagrange-protobuf.git
