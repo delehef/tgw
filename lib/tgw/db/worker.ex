@@ -3,10 +3,10 @@ defmodule Tgw.Db.Worker do
   import Ecto.Changeset
 
   schema "workers" do
-    field :average_speed, :float, default: 0.0
     field :name, :string
-    field :samples_size, :integer, default: 0
     field :score, :float, default: 0.0
+    field :average_speed, :float, default: 0.0
+    field :samples_size, :integer, default: 0
     field :operator_id, :id
     field :busy, :boolean, default: false
 
@@ -16,8 +16,8 @@ defmodule Tgw.Db.Worker do
   @doc false
   def changeset(worker, attrs) do
     worker
-    |> cast(attrs, [:name, :score, :average_speed, :samples_size])
-    |> validate_required([:name, :score, :average_speed, :samples_size])
+    |> cast(attrs, [:name, :score, :average_speed, :samples_size, :operator_id, :busy])
+    |> validate_required([:name, :score, :average_speed, :samples_size, :operator_id, :busy])
     |> unique_constraint(:unique_name, name: :unique_name)
   end
 end

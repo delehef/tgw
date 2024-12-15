@@ -17,19 +17,28 @@ defmodule Tgw.Lagrange.Client do
   end
 
   @impl GenServer
-  def handle_call({:set_stream, stream}, _, state), do: {:reply, :ok, Map.put(state, :client, stream)}
+  def handle_call({:set_stream, stream}, _, state), do: {:reply, :ok, Map.put(state, :stream, stream)}
 
   @impl GenServer
-  def handle_info({:notification, {:new_proof, %Lagrange.UUID{id: uuid}}}, state) do
-    Logger.info("new proof for user is ready: #{inspect(uuid)}")
+  def handle_info({:new_proof, proof_id}, state) do
+    task = Tgw.Repo.get_by!(Tgw.Db.Task, ready_proof: proof_id)
+    proof = Tgw.Repo.get_by!(Tgw.Db.Proof, id: proof_id)
+    Logger.info("new proof for user is ready for proof #{inspect(task.id)}")
 
-    payload = Tgw.Repo.query!(from p in Tgw.Db.Proof, where: p.id == ^uuid, select: p.proof)
+    proof_ready = %Lagrange.ProofReady{
+      task_id: %Lagrange.UUID{id: task.id},
+      task_output: proof.proof
+    }
+    response = %Lagrange.ProofChannelResponse{response: {:proof, proof_ready}}
 
-    GRPC.Server.send_reply(state.stream, %Lagrange.ProofChannelResponse{
-          response: %Lagrange.ProofReady{
-            task_id: %Lagrange.UUID{id: uuid},
-            task_output: payload }})
+    GRPC.Server.send_reply(state.stream, response)
 
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(msg, state) do
+    Logger.warning("Unexpected info: #{inspect(msg)}")
     {:noreply, state}
   end
 end

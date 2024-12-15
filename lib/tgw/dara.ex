@@ -19,7 +19,7 @@ defmodule Tgw.Lagrange.DARA do
     state =
       state
       |> Map.put_new(:interval, 15_000)
-      |> Map.put_new(:schedule, schedule_work(15_000))
+      |> Map.put_new(:schedule, schedule_work(3_000))
       |> Map.put_new(:workers, %{})
 
     {:ok, state}

@@ -13,7 +13,7 @@ defmodule Tgw.Db.Job do
   @doc false
   def changeset(job, attrs) do
     job
-    |> cast(attrs, [:status])
-    |> validate_required([:status])
+    |> cast(attrs, [:status, :task_id, :worker_id])
+    |> validate_required([:status, :task_id, :worker_id])
   end
 end

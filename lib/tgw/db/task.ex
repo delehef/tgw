@@ -10,7 +10,7 @@ defmodule Tgw.Db.Task do
     field :price_requested, :decimal
     field :class, :string
     field :task, :binary
-    field :ready_proof, :id
+    field :ready_proof, :integer
     field :acked_by_client, :boolean, default: false
 
     timestamps(type: :utc_datetime)
@@ -19,7 +19,7 @@ defmodule Tgw.Db.Task do
   @doc false
   def changeset(task, attrs) do
     task
-    |> cast(attrs, [:class, :user_task_id, :price_requested, :task, :acked_by_client])
-    |> validate_required([:class, :user_task_id, :price_requested, :task, :acked_by_client])
+    |> cast(attrs, [:status, :class, :user_task_id, :price_requested, :class, :task, :ready_proof, :acked_by_client])
+    |> validate_required([:status, :class, :user_task_id, :price_requested, :class, :task, :acked_by_client])
   end
 end

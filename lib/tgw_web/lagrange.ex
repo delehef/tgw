@@ -2,6 +2,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
   require Logger
   use GRPC.Server, service: Lagrange.ClientsService.Service
   alias Tgw.Repo
+  import Ecto.Query
 
   @spec submit_task(Lagrange.SubmitTaskRequest.t, GRPC.Server.Stream.t):: Lagrange.SubmitTaskResponse.t
   def submit_task(request, _stream) do
@@ -28,7 +29,24 @@ defmodule TgwWeb.Lagrange.ClientServer do
 
   def proof_channel(request, stream) do
     Tgw.Lagrange.Client.set_stream(stream)
-    Enum.each(request, fn req -> IO.puts("Proof channel request was: #{inspect(req)}") end)
+    Enum.each(request, fn req ->
+      case req do
+        %Lagrange.ProofChannelRequest{
+          request: {
+            :acked_messages,
+            %Lagrange.AckedMessages{
+              acked_messages: uuids}}} ->
+          ids = Enum.map(uuids, fn uuid -> uuid.id end)
+
+          Logger.info("updating acked proofs: #{inspect(ids)}")
+          Tgw.Repo.update_all(
+            from(t in Tgw.Db.Task, where: t.id in ^ids),
+            set: [acked_by_client: true]
+          )
+
+        _ ->
+          Logger.warning("Unexpected proof channel request: #{inspect(req)}") end
+    end)
   end
 end
 
@@ -49,6 +67,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           worker_name = inspect(ip) <> ":" <> inspect(port)
           headers = GRPC.Stream.get_headers(stream)
           Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
+
           worker = %Tgw.Db.Worker{
             operator_id: 1,
             name: worker_name
@@ -75,9 +94,12 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           Logger.info("task #{Kernel.inspect(uuid)} completed")
 
           # Save the proof payload to the DB and broadcast its readiness
-          with task <- Tgw.Repo.get(Tgw.Db.Task, uuid),
-          {:ok, _} <- Tgw.Repo.update(Ecto.Changeset.change(task, proof: payload)) do
-            Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, task.id})
+          with task when not is_nil(task) <- Tgw.Repo.get(Tgw.Db.Task, uuid),
+          job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, task_id: uuid),
+          {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}),
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.changeset(task, %{status: 2, ready_proof: proof.id})),
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.changeset(job, %{status: 2})) do
+            Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, proof.id})
           else
             nil ->
               Logger.error("unknown task #{uuid}; ignoring proof")
