@@ -19,7 +19,8 @@ defmodule Tgw.Application do
       # Start to serve requests, typically the last entry
       TgwWeb.Endpoint,
       {GRPC.Server.Supervisor, endpoint: TgwWeb.Endpoint, port: 9000, start_server: true},
-      {Tgw.Lagrange.DARA, []}
+      {Tgw.Lagrange.DARA, []},
+      {Tgw.Lagrange.Client, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

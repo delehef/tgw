@@ -27,20 +27,8 @@ defmodule TgwWeb.Lagrange.ClientServer do
   end
 
   def proof_channel(request, stream) do
-    IO.puts("Proof channel request was:")
-    IO.inspect(request)
-
-    proof_loop(stream)
-  end
-
-  defp proof_loop(stream) do
-    receive do
-      msg ->
-        IO.puts("Received unexpected message:")
-        IO.inspect(msg)
-        GRPC.Server.send_reply(stream, Lagrange.SubmitTaskResponse.encode(%{}))
-        proof_loop(stream)
-    end
+    Tgw.Lagrange.Client.set_stream(stream)
+    Enum.each(request, fn req -> IO.puts("Proof channel request was: #{inspect(req)}") end)
   end
 end
 
@@ -49,9 +37,6 @@ defmodule TgwWeb.Lagrange.WorkerServer do
   use GRPC.Server, service: Lagrange.WorkersService.Service
 
   def worker_to_gw(req_enum, stream) do
-    GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{
-          task_id: %Lagrange.UUID{id: "asdf-fdsa"},
-          task: "asdf"})
     Enum.each(req_enum, fn req ->
       case req do
         %Lagrange.WorkerToGwRequest {
@@ -80,17 +65,28 @@ defmodule TgwWeb.Lagrange.WorkerServer do
             request: {
               :worker_done,
               %Lagrange.WorkerDone {
-                task_id: task_id,
-                reply: {
-                  :task_output,
-                  payload
+                task_id: %Lagrange.UUID {id: uuid},
+                reply: {:task_output, payload
                 }
               }
             }
           } ->
-          Logger.info("task #{Kernel.inspect(task_id)} completed")
+
+          Logger.info("task #{Kernel.inspect(uuid)} completed")
+
+          # Save the proof payload to the DB and broadcast its readiness
+          with task <- Tgw.Repo.get(Tgw.Db.Task, uuid),
+          {:ok, _} <- Tgw.Repo.update(Ecto.Changeset.change(task, proof: payload)) do
+            Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, task.id})
+          else
+            nil ->
+              Logger.error("unknown task #{uuid}; ignoring proof")
+            {:error, changeset} ->
+              Logger.error("failed to update task with proof: #{inspect(changeset)}")
+          end
+
         _ ->
-          Logger.error("Unexpected worker message: #{Kernel.inspect(req)}")
+          Logger.error("unexpected worker message: #{Kernel.inspect(req)}")
       end
 
     end)

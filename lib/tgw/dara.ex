@@ -43,7 +43,7 @@ defmodule Tgw.Lagrange.DARA do
       |> Ecto.Multi.run(:send_to_grpc, fn _, _ ->
         stream = Map.get(state.workers, worker.name)
         try do
-          GRPC.Server.send_reply(IO.inspect(stream), %Lagrange.WorkerToGwResponse{
+          GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{
                 task_id: %Lagrange.UUID{id: task.id},
                 task: task.task})
           {:ok, {}}
