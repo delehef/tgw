@@ -60,7 +60,8 @@ defmodule Tgw.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:protobuf, "~> 0.13.0"},
-      {:grpc, "~> 0.9"}
+      {:grpc, "~> 0.9"},
+      {:google_protos, "~> 0.4.0"}
     ]
   end
 
