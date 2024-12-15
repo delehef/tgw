@@ -4,7 +4,7 @@ defmodule TgwWeb.Endpoint do
 
   intercept GRPC.Server.Interceptors.Logger
   run TgwWeb.Lagrange.ClientServer
-  run TgwWeb.Lagrange.WorkerServer, interceptors: [Tgw.Lagrange.Authenticator]
+  run TgwWeb.Lagrange.WorkerServer, interceptors: [Tgw.Rpc.Authenticator]
 
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.

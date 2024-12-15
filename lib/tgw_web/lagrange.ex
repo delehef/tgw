@@ -10,7 +10,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
 
     task = %Tgw.Db.Task{
       user_task_id: request.user_task_id,
-      price_requested: 1500, # FIXME:
+      price_requested: 1500, # FIXME: need to parse int from bytes
       class: request.class,
       task: request.task_bytes,
     }
@@ -29,6 +29,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
 
   def proof_channel(request, stream) do
     Tgw.Lagrange.Client.set_stream(stream)
+
     Enum.each(request, fn req ->
       case req do
         %Lagrange.ProofChannelRequest{
@@ -45,7 +46,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
           )
 
         _ ->
-          Logger.warning("Unexpected proof channel request: #{inspect(req)}") end
+          Logger.warning("unexpected proof channel request: #{inspect(req)}") end
     end)
   end
 end
@@ -63,9 +64,11 @@ defmodule TgwWeb.Lagrange.WorkerServer do
             %Lagrange.WorkerReady {
               version: _version, worker_class: _worker_class
             }}} ->
+          headers = GRPC.Stream.get_headers(stream)
+          # NOTE: This cannot failed, as it would have failed at authentication.
+          {:ok, token} = Tgw.Rpc.Authenticator.decode_token(headers)
           {ip, port} = stream.adapter.get_peer(stream.payload)
           worker_name = inspect(ip) <> ":" <> inspect(port)
-          headers = GRPC.Stream.get_headers(stream)
           Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
 
           worker = %Tgw.Db.Worker{
@@ -97,8 +100,8 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           with task when not is_nil(task) <- Tgw.Repo.get(Tgw.Db.Task, uuid),
           job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, task_id: uuid),
           {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.changeset(task, %{status: 2, ready_proof: proof.id})),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.changeset(job, %{status: 2})) do
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.mark_succesful(task)),
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.mark_succesful(job)) do
             Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, proof.id})
           else
             nil ->
