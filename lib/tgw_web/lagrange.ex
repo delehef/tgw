@@ -57,30 +57,33 @@ defmodule Tgw.Lagrange.DARA do
   use GenServer
 
   def start_link(_) do
-    Logger.debug("DARA start-link")
     GenServer.start_link(__MODULE__, %{}, name: :DARA)
   end
 
-  def start(_) do
-    GenServer.start(__MODULE__, %{}, name: :DARA)
+  def debug() do
+    GenServer.call(:DARA, {:debug})
   end
 
   @impl GenServer
   def init(state) do
-    Logger.debug("DARA Init")
     state =
       state
-      |> Map.put_new(:interval, 5_000)
-      |> Map.put_new(:schedule, schedule_work(5_000))
+      |> Map.put_new(:interval, 15_000)
+      |> Map.put_new(:schedule, schedule_work(15_000))
 
     {:ok, state}
   end
 
   @impl GenServer
   def handle_info(:work, state) do
-    Logger.debug("DARA called")
     # TODO: actually run DARA/ProofPHI
     {:noreply, Map.put(state, :schedule, schedule_work(state.interval))}
+  end
+
+  def handle_info(:debug, state) do
+    Logger.debug("===== DARA debugging =====")
+    IO.inspect(state)
+    {:noreply, state}
   end
 
   # We may receive some runtime-emitted messages we don't want to crah on.
