@@ -3,11 +3,11 @@ defmodule Tgw.Db.Operator do
   import Ecto.Changeset
 
   schema "operators" do
-    field :address, :decimal
+    field :address, :string
     field :name, :string
     field :public_key, :string
     field :enabled, :boolean, default: false
-    field :eth_staked, :decimal
+    field :eth_staked, :integer
 
     timestamps(type: :utc_datetime)
   end

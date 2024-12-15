@@ -10,7 +10,7 @@ defmodule Tgw.Db.Task do
     field :price_requested, :decimal
     field :class, :string
     field :task, :binary
-    field :ready_proof, :binary_id
+    field :ready_proof, :id
     field :acked_by_client, :boolean, default: false
 
     timestamps(type: :utc_datetime)
