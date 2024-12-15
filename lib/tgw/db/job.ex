@@ -4,7 +4,8 @@ defmodule Tgw.Db.Job do
 
   schema "jobs" do
     field :status, :integer
-    field :operator_id, :id
+    field :task_id, :binary_id
+    field :worker_id, :id
 
     timestamps(type: :utc_datetime)
   end

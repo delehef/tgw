@@ -4,11 +4,12 @@ defmodule Tgw.Repo.Migrations.CreateJobs do
   def change do
     create table(:jobs) do
       add :status, :integer, null: false, default: 1
-      add :operator_id, references(:operators, on_delete: :nothing)
+      add :task_id, references(:tasks, type: :binary_id, on_delete: :nothing)
+      add :worker_id, references(:workers, on_delete: :nothing)
 
       timestamps(type: :utc_datetime)
     end
 
-    create index(:jobs, [:operator_id])
+    create index(:jobs, [:worker_id])
   end
 end

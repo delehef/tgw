@@ -7,7 +7,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
   def submit_task(request, _stream) do
     Logger.info("new proof request: #{request.user_task_id}")
 
-    task = %Tgw.Tgw.Task{
+    task = %Tgw.Db.Task{
       user_task_id: request.user_task_id,
       price_requested: 1500, # FIXME:
       class: request.class,

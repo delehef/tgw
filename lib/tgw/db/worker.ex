@@ -8,6 +8,7 @@ defmodule Tgw.Db.Worker do
     field :samples_size, :integer, default: 0
     field :score, :float, default: 0.0
     field :operator_id, :id
+    field :busy, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end
@@ -17,5 +18,6 @@ defmodule Tgw.Db.Worker do
     worker
     |> cast(attrs, [:name, :score, :average_speed, :samples_size])
     |> validate_required([:name, :score, :average_speed, :samples_size])
+    |> unique_constraint(:unique_name, name: :unique_name)
   end
 end
