@@ -1,12 +1,12 @@
-defmodule Tgw.Tgw.Worker do
+defmodule Tgw.Db.Worker do
   use Ecto.Schema
   import Ecto.Changeset
 
   schema "workers" do
-    field :average_speed, :float
+    field :average_speed, :float, default: 0.0
     field :name, :string
-    field :samples_size, :integer
-    field :score, :float
+    field :samples_size, :integer, default: 0
+    field :score, :float, default: 0.0
     field :operator_id, :id
 
     timestamps(type: :utc_datetime)

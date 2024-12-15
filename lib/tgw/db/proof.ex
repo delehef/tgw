@@ -1,4 +1,4 @@
-defmodule Tgw.Tgw.Proof do
+defmodule Tgw.Db.Proof do
   use Ecto.Schema
   import Ecto.Changeset
 

@@ -1,4 +1,4 @@
-defmodule Tgw.Tgw.Operator do
+defmodule Tgw.Db.Operator do
   use Ecto.Schema
   import Ecto.Changeset
 

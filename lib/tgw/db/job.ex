@@ -1,4 +1,4 @@
-defmodule Tgw.Tgw.Job do
+defmodule Tgw.Db.Job do
   use Ecto.Schema
   import Ecto.Changeset
 
