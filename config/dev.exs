@@ -2,13 +2,14 @@ import Config
 
 # Configure your database
 config :tgw, Tgw.Repo,
-  username: "postgres",
-  password: "postgres",
+  username: "tgw",
+  password: "asdf",
   hostname: "localhost",
   database: "tgw_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  pool_size: 10,
+  migration_primary_key: [type: :identity]
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

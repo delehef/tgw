@@ -1,13 +1,20 @@
 { pkgs, lib, config, inputs, ... }:
 
+let
+  db = {
+    user = "tgw";
+    password = "asdf";
+    dbName = "tgw_dev";
+  };
+in
 {
   cachix.enable = false;
-  
+
   # https://devenv.sh/basics/
   env.GREET = "devenv";
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git pkgs.protobuf ];
+  packages = [ pkgs.git pkgs.protobuf pkgs.erlang ];
 
   # https://devenv.sh/languages/
   languages.elixir.enable = true;
@@ -16,7 +23,16 @@
   # processes.cargo-watch.exec = "cargo-watch";
 
   # https://devenv.sh/services/
-  services.postgres.enable = true;
+  services = {
+    postgres = {
+      enable = true;
+      listen_addresses = "127.0.0.1";
+      initialScript = ''
+    CREATE ROLE ${db.user} WITH PASSWORD '${db.password}' SUPERUSER LOGIN;
+    '';
+      initialDatabases = [ { name = db.dbName; } ];
+    };
+  };
 
   # https://devenv.sh/scripts/
   scripts.hello.exec = ''
