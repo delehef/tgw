@@ -9,7 +9,7 @@ defmodule Tgw.Application do
   def start(_type, _args) do
     children = [
       TgwWeb.Telemetry,
-      # Tgw.Repo,
+      Tgw.Repo,
       {DNSCluster, query: Application.get_env(:tgw, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tgw.PubSub},
       # Start the Finch HTTP client for sending emails
@@ -18,7 +18,8 @@ defmodule Tgw.Application do
       # {Tgw.Worker, arg},
       # Start to serve requests, typically the last entry
       TgwWeb.Endpoint,
-      {GRPC.Server.Supervisor, endpoint: TgwWeb.Endpoint, port: 9000, start_server: true}
+      {GRPC.Server.Supervisor, endpoint: TgwWeb.Endpoint, port: 9000, start_server: true},
+      {Tgw.Lagrange.DARA, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

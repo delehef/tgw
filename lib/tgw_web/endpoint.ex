@@ -3,7 +3,7 @@ defmodule TgwWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :tgw
 
   intercept GRPC.Server.Interceptors.Logger
-  run TgwWeb.Lagrange.Server
+  run TgwWeb.Lagrange.ClientServer
 
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
