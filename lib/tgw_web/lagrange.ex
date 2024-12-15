@@ -48,48 +48,9 @@ defmodule TgwWeb.Lagrange.WorkerServer do
   require Logger
   use GRPC.Server, service: Lagrange.WorkersService.Service
 
-  def worker_to_gw() do
-  end
-end
-
-defmodule Tgw.Lagrange.DARA do
-  require Logger
-  use GenServer
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: :DARA)
-  end
-
-  def debug() do
-    GenServer.call(:DARA, {:debug})
-  end
-
-  @impl GenServer
-  def init(state) do
-    state =
-      state
-      |> Map.put_new(:interval, 15_000)
-      |> Map.put_new(:schedule, schedule_work(15_000))
-
-    {:ok, state}
-  end
-
-  @impl GenServer
-  def handle_info(:work, state) do
-    # TODO: actually run DARA/ProofPHI
-    {:noreply, Map.put(state, :schedule, schedule_work(state.interval))}
-  end
-
-  def handle_info(:debug, state) do
-    Logger.debug("===== DARA debugging =====")
-    IO.inspect(state)
-    {:noreply, state}
-  end
-
-  # We may receive some runtime-emitted messages we don't want to crah on.
-  def handle_info(_, state), do: {:noreply, state}
-
-  defp schedule_work(interval) when is_integer(interval) and interval > 0 do
-    Process.send_after(self(), :work, interval)
+  def worker_to_gw(req_enum, stream) do
+    Enum.each(req_enum, fn req ->
+      IO.puts("Received a server message: #{req}")
+    end)
   end
 end
