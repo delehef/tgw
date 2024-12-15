@@ -49,8 +49,51 @@ defmodule TgwWeb.Lagrange.WorkerServer do
   use GRPC.Server, service: Lagrange.WorkersService.Service
 
   def worker_to_gw(req_enum, stream) do
+    GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{
+          task_id: %Lagrange.UUID{id: "asdf-fdsa"},
+          task: "asdf"})
     Enum.each(req_enum, fn req ->
-      IO.puts("Received a server message: #{req}")
+      case req do
+        %Lagrange.WorkerToGwRequest {
+          request: {
+            :worker_ready,
+            %Lagrange.WorkerReady {
+              version: _version, worker_class: _worker_class
+            }}} ->
+          {ip, port} = stream.adapter.get_peer(stream.payload)
+          worker_name = inspect(ip) <> ":" <> inspect(port)
+          headers = GRPC.Stream.get_headers(stream)
+          Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
+          worker = %Tgw.Db.Worker{
+            operator_id: 1,
+            name: worker_name
+          }
+          case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
+           :ok ->
+              Logger.info("worker successfully inserted")
+            err ->
+              Logger.info("failed to save worker: #{inspect(err)}")
+          end
+
+
+          %Lagrange.WorkerToGwRequest{
+            request: {
+              :worker_done,
+              %Lagrange.WorkerDone {
+                task_id: task_id,
+                reply: {
+                  :task_output,
+                  payload
+                }
+              }
+            }
+          } ->
+          Logger.info("task #{Kernel.inspect(task_id)} completed")
+        _ ->
+          Logger.error("Unexpected worker message: #{Kernel.inspect(req)}")
+      end
+
     end)
+    Logger.warning("Worker left")
   end
 end
