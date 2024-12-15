@@ -86,9 +86,9 @@ defmodule Tgw.Lagrange.DARA do
   @impl GenServer
   def handle_call({:new_worker, worker, stream}, _, state) do
     case Tgw.Repo.insert(worker) do
-      {:ok, _} ->
+      {:ok, worker} ->
         {_, state} = get_and_update_in(state, [:workers], &{&1, Map.put(&1, worker.name, stream)})
-        {:reply, :ok, state}
+        {:reply, {:ok, worker}, state}
 
       {:error, _} ->
         Logger.error("failed to insert worker #{worker.name}")

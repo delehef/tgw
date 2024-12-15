@@ -65,6 +65,28 @@ defmodule TgwWeb.Lagrange.WorkerServer do
     GRPC.Server.send_headers(stream, headers)
     # HACK
 
+    headers = GRPC.Stream.get_headers(stream)
+    # NOTE: This cannot failed, as it would have failed at authentication.
+    {:ok, token} = Tgw.Rpc.Authenticator.decode_token(headers)
+    {ip, port} = stream.adapter.get_peer(stream.payload)
+    worker_name = inspect(ip) <> ":" <> inspect(port)
+    Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
+
+    worker = %Tgw.Db.Worker{
+      operator_id: 1,
+      name: worker_name,
+      busy: true
+    }
+    worker =
+      case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
+        {:ok, worker} ->
+          Logger.info("worker #{inspect(worker)} successfully inserted")
+          worker
+        err ->
+          Logger.error("failed to save worker: #{inspect(err)}")
+          raise GRPC.RPCError, status: :internal
+      end
+
     Enum.each(req_enum, fn req ->
       case req do
         %Lagrange.WorkerToGwRequest {
@@ -73,22 +95,12 @@ defmodule TgwWeb.Lagrange.WorkerServer do
             %Lagrange.WorkerReady {
               version: _version, worker_class: _worker_class
             }}} ->
-          headers = GRPC.Stream.get_headers(stream)
-          # NOTE: This cannot failed, as it would have failed at authentication.
-          {:ok, token} = Tgw.Rpc.Authenticator.decode_token(headers)
-          {ip, port} = stream.adapter.get_peer(stream.payload)
-          worker_name = inspect(ip) <> ":" <> inspect(port)
-          Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
-
-          worker = %Tgw.Db.Worker{
-            operator_id: 1,
-            name: worker_name
-          }
-          case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
-           :ok ->
-              Logger.info("worker successfully inserted")
+          with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Worker.mark_ready(worker)) do
+            Logger.info("worker #{worker.name} ready to work")
+          else
             err ->
-              Logger.info("failed to save worker: #{inspect(err)}")
+              Logger.error("failed to mark worker as ready: #{inspect(err)}")
           end
 
 
@@ -117,6 +129,15 @@ defmodule TgwWeb.Lagrange.WorkerServer do
               Logger.error("unknown task #{uuid}; ignoring proof")
             {:error, changeset} ->
               Logger.error("failed to update task with proof: #{inspect(changeset)}")
+          end
+
+          # Mark the worker as ready again
+          with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
+          {:ok, worker} <- Tgw.Repo.update(Tgw.Db.Worker.mark_ready(worker)) do
+            Logger.info("worker #{worker.name} ready to work again")
+          else
+            err ->
+              Logger.error("failed to mark worker as ready: #{inspect(err)}")
           end
 
         _ ->

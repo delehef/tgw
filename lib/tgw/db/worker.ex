@@ -20,4 +20,6 @@ defmodule Tgw.Db.Worker do
     |> validate_required([:name, :score, :average_speed, :samples_size, :operator_id, :busy])
     |> unique_constraint(:unique_name, name: :unique_name)
   end
+
+  def mark_ready(worker), do: changeset(worker, %{busy: false})
 end
