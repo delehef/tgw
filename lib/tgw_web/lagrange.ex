@@ -29,6 +29,10 @@ defmodule TgwWeb.Lagrange.ClientServer do
 
   def proof_channel(request, stream) do
     Tgw.Lagrange.Client.set_stream(stream)
+    # HACK
+    headers = GRPC.Stream.get_headers(stream)
+    GRPC.Server.send_headers(stream, headers)
+    # HACK
 
     Enum.each(request, fn req ->
       case req do
@@ -56,6 +60,11 @@ defmodule TgwWeb.Lagrange.WorkerServer do
   use GRPC.Server, service: Lagrange.WorkersService.Service
 
   def worker_to_gw(req_enum, stream) do
+    # HACK
+    headers = GRPC.Stream.get_headers(stream)
+    GRPC.Server.send_headers(stream, headers)
+    # HACK
+
     Enum.each(req_enum, fn req ->
       case req do
         %Lagrange.WorkerToGwRequest {
@@ -100,8 +109,8 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           with task when not is_nil(task) <- Tgw.Repo.get(Tgw.Db.Task, uuid),
           job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, task_id: uuid),
           {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.mark_succesful(task)),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.mark_succesful(job)) do
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.mark_successful(task, proof.id)),
+          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.mark_successful(job)) do
             Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, proof.id})
           else
             nil ->

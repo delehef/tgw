@@ -21,6 +21,6 @@ defmodule Tgw.Db.Job do
     |> validate_required([:status, :task_id, :worker_id])
   end
 
-  def mark_succesful(job), do: changeset(job, %{status: @successful})
+  def mark_successful(job), do: changeset(job, %{status: @successful})
   def mark_failed(job), do: changeset(job, %{status: @failed})
 end
