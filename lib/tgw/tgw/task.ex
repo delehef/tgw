@@ -5,13 +5,13 @@ defmodule Tgw.Tgw.Task do
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
   schema "tasks" do
-    field :acked_by_client, :boolean, default: false
-    field :class, :string
-    field :price_requested, :decimal
-    field :task, :binary
     field :user_task_id, :string
+    field :price_requested, :decimal
+    field :class, :string
+    field :task, :binary
     field :assigned_job, :binary_id
     field :ready_proof, :binary_id
+    field :acked_by_client, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end
