@@ -1,4 +1,5 @@
 defmodule Tgw.Db.Worker do
+  require Logger
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query
@@ -6,6 +7,7 @@ defmodule Tgw.Db.Worker do
   @unavailable 0
   @ready 1
   @working 2
+  @timedout 3
 
 
   schema "workers" do
@@ -29,10 +31,22 @@ defmodule Tgw.Db.Worker do
 
   def workers_ready(), do: Tgw.Repo.all(from(w in Tgw.Db.Worker, where: w.status == ^@ready))
 
+  def has_timedout(worker), do: worker.status == @timedout
+
   def mark_ready(worker), do: Tgw.Repo.update(changeset(worker, %{status: @ready}))
   def mark_unavailable(worker), do: Tgw.Repo.update(changeset(worker, %{status: @unavailable}))
   def mark_working(worker), do: Tgw.Repo.update(changeset(worker, %{status: @working}))
-  def penalize(worker), do: Tgw.Repo.update(changeset(worker, %{score: worker.score - 1}))
+  def mark_timedout(worker), do: Tgw.Repo.update(
+        changeset(worker, %{status: @timedout, score: worker.score - 1}))
+
+  def un_timeout(worker) do
+    if worker.score > -5 do
+      Logger.info("un-timingout worker #{worker.name}")
+      mark_ready(worker)
+    else
+      Logger.warning("worker #{worker.name} has score #{worker.score}")
+    end
+  end
 
   def get_or_insert(worker) do
     Tgw.Repo.insert(

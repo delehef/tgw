@@ -5,6 +5,7 @@ defmodule Tgw.Db.Job do
   @running 1
   @successful 2
   @failed 3
+  @timedout 4
 
   schema "jobs" do
     field :status, :integer
@@ -21,6 +22,7 @@ defmodule Tgw.Db.Job do
     |> validate_required([:status, :task_id, :worker_id])
   end
 
-  def mark_successful(job), do: changeset(job, %{status: @successful})
-  def mark_failed(job), do: changeset(job, %{status: @failed})
+  def mark_successful(job), do: Tgw.Repo.update(changeset(job, %{status: @successful}))
+  def mark_failed(job), do: Tgw.Repo.update(changeset(job, %{status: @failed}))
+  def mark_timedout(job), do: Tgw.Repo.update(changeset(job, %{status: @timedout}))
 end

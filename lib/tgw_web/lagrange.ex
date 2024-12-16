@@ -13,6 +13,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
       price_requested: 1500, # FIXME: need to parse int from bytes
       class: request.class,
       task: request.task_bytes,
+      time_to_live: request.timeout.seconds,
     }
 
     case Repo.insert(task) do
@@ -20,10 +21,11 @@ defmodule TgwWeb.Lagrange.ClientServer do
       {:error, changeset} ->
         errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
           Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
-            opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+            Keyword.get(opts, String.to_existing_atom(key), key) |> to_string()
           end)
         end)
         Logger.error("failed to insert task #{request.user_task_id}: #{errors}")
+        raise GRPC.RPCError, status: :internal
     end
   end
 
@@ -77,11 +79,11 @@ defmodule TgwWeb.Lagrange.WorkerServer do
       name: worker_name,
       status: 1,
     }
-    worker =
+    worker_id =
       case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
         {:ok, worker} ->
           Logger.info("worker #{inspect(worker)} successfully inserted")
-          worker
+          worker.id
         err ->
           Logger.error("failed to save worker: #{inspect(err)}")
           raise GRPC.RPCError, status: :internal
@@ -95,7 +97,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
             %Lagrange.WorkerReady {
               version: _version, worker_class: _worker_class
             }}} ->
-          with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
+          with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker_id),
           {:ok, _} <- Tgw.Db.Worker.mark_ready(worker) do
             Logger.info("worker #{worker.name} ready to work")
           else
@@ -118,28 +120,42 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           Logger.info("task #{inspect(uuid)} completed")
 
           # Save the proof payload to the DB and broadcast its readiness
-          with task when not is_nil(task) <- Tgw.Repo.get(Tgw.Db.Task, uuid),
-          job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, task_id: uuid),
-          {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Task.mark_successful(task, proof.id)),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Job.mark_successful(job)) do
-            Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, proof.id})
+          with worker when not is_nil(worker) <- Tgw.Repo.get(Tgw.Db.Worker, worker_id),
+          {:job, job} when not is_nil(job) <- {:job, Tgw.Repo.get_by(
+            Tgw.Db.Job,
+            [task_id: uuid, worker_id: worker.id, status: 1])},
+          {:task, task} when not is_nil(task) <- {:task, Tgw.Repo.get(Tgw.Db.Task, uuid)},
+          {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}) do
+            if Tgw.Db.Worker.has_timedout(worker) do
+              Logger.warning("ignoring proof for task #{task.id} from timed-out worker #{worker.name}")
+              Tgw.Db.Job.mark_timedout(job)
+              Tgw.Db.Worker.un_timeout(worker)
+            else
+              # Mark the task and its associated job as ssuccesful
+              with {:ok, _} <- Tgw.Db.Task.mark_successful(task, proof.id),
+              {:ok, _} <- Tgw.Db.Job.mark_successful(job) do
+                Phoenix.PubSub.broadcast(Tgw.PubSub, "proofs", {:new_proof, proof.id})
+                # Mark the worker as ready again
+                with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
+                {:ok, worker} <- Tgw.Db.Worker.mark_ready(worker) do
+                  Logger.info("worker #{worker.name} ready to work again")
+                else
+                  err ->
+                    Logger.error("failed to mark worker as ready: #{inspect(err)}")
+                end
+              else
+                msg -> Logger.error("failed to mark task #{task.id} as successful: #{inspect(msg)}")
+              end
+            end
           else
-            nil ->
+            {:task, nil} ->
               Logger.error("unknown task #{uuid}; ignoring proof")
+            {:job, nil} ->
+              Logger.error("failed to find a job for task #{uuid} and worker #{worker.name}")
             {:error, changeset} ->
               Logger.error("failed to update task with proof: #{inspect(changeset)}")
+            msg -> Logger.error("unexpected error: #{inspect(msg)}")
           end
-
-          # Mark the worker as ready again
-          with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
-          {:ok, worker} <- Tgw.Db.Worker.mark_ready(worker) do
-            Logger.info("worker #{worker.name} ready to work again")
-          else
-            err ->
-              Logger.error("failed to mark worker as ready: #{inspect(err)}")
-          end
-
         _ ->
           Logger.error("unexpected worker message: #{Kernel.inspect(req)}")
       end
