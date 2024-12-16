@@ -22,4 +22,13 @@ defmodule Tgw.Db.Worker do
   end
 
   def mark_ready(worker), do: changeset(worker, %{busy: false})
+  def penalize(worker), do: changeset(worker, %{score: worker.score - 1})
+
+  def get_or_insert(worker) do
+    Tgw.Repo.insert(
+      worker,
+      on_conflict: [set: [name: worker.name]],
+      conflict_target: [:operator_id, :name]
+    )
+  end
 end

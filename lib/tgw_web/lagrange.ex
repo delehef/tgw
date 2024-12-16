@@ -115,7 +115,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
             }
           } ->
 
-          Logger.info("task #{Kernel.inspect(uuid)} completed")
+          Logger.info("task #{inspect(uuid)} completed")
 
           # Save the proof payload to the DB and broadcast its readiness
           with task when not is_nil(task) <- Tgw.Repo.get(Tgw.Db.Task, uuid),
