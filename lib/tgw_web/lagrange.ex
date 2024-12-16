@@ -9,7 +9,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
     Logger.info("new proof request: #{request.user_task_id}")
 
     task = %Tgw.Db.Task{
-      user_task_id: request.user_task_id,
+      user_task_id: String.slice(request.user_task_id, 0, 200),
       price_requested: 1500, # FIXME: need to parse int from bytes
       class: request.class,
       task: request.task_bytes,
