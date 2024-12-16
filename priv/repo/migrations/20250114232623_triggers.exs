@@ -1,4 +1,4 @@
-defmodule Tgw.Repo.Migrations.Init do
+defmodule Tgw.Repo.Migrations.Triggers do
   use Ecto.Migration
 
   def change do
