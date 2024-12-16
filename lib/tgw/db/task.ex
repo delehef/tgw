@@ -37,6 +37,12 @@ defmodule Tgw.Db.Task do
   def mark_successful(task, proof_id), do: Tgw.Repo.update(changeset(task, %{status: @successful, ready_proof: proof_id}))
   def mark_failed(task), do: Tgw.Repo.update(changeset(task, %{status: @failed}))
 
+  def non_acked do
+    q = from t in Tgw.Db.Task,
+      where: t.status == ^@successful and t.acked_by_client == false
+    Tgw.Repo.all(q)
+  end
+
   def query_to_process() do
     from t in Tgw.Db.Task,
       where: t.status == ^@ready,

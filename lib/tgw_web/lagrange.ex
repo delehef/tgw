@@ -36,6 +36,10 @@ defmodule TgwWeb.Lagrange.ClientServer do
     GRPC.Server.send_headers(stream, headers)
     # HACK
 
+    # Re-send ready but non-acked proof on connection opening
+    Tgw.Lagrange.Client.send_ready()
+
+
     Enum.each(request, fn req ->
       case req do
         %Lagrange.ProofChannelRequest{
