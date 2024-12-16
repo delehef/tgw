@@ -4,7 +4,7 @@ defmodule Tgw.Repo.Migrations.CreateWorkers do
   def change do
     create table(:workers) do
       add :name, :string
-      add :busy, :boolean
+      add :status, :integer
       add :score, :float
       add :average_speed, :float
       add :samples_size, :integer

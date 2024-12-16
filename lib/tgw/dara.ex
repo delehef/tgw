@@ -2,8 +2,6 @@ defmodule Tgw.Lagrange.DARA do
   require Logger
   use GenServer
 
-  import Ecto.Query
-
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: :DARA)
   end
@@ -27,18 +25,15 @@ defmodule Tgw.Lagrange.DARA do
 
   @impl GenServer
   def handle_info(:work, state) do
-    tasks = Tgw.Repo.all(from(t in Tgw.Db.Task,
-          where: t.status == 0,
-          order_by: [desc: t.price_requested]
-        ))
-    workers = Tgw.Repo.all(from(w in Tgw.Db.Worker, where: w.busy == false))
+    tasks = Tgw.Repo.all(Tgw.Db.Task.query_to_process())
+    workers = Tgw.Db.Worker.workers_ready()
 
     new_state = Enum.zip(tasks, workers) |> Enum.reduce(state, fn {task, worker}, state ->
       Logger.info("assigning #{inspect(task.id)} to #{worker.name}")
 
       assign_to_worker = Ecto.Multi.new()
       |> Ecto.Multi.update(:update_task, Ecto.Changeset.change(task, %{status: 1}))
-      |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{busy: true}))
+      |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{status: 2}))
       |> Ecto.Multi.insert(:create_job, %Tgw.Db.Job{status: 1, task_id: task.id, worker_id: worker.id})
       |> Ecto.Multi.run(:send_to_grpc, fn _, _ ->
         stream = Map.get(state.workers, worker.name)
@@ -58,7 +53,9 @@ defmodule Tgw.Lagrange.DARA do
           Logger.error("failed to create job at stage #{stage}: #{value}")
           if stage == :send_to_grpc do
             Logger.warning("sending to gRPC failed; removing worker")
-            get_and_update_in(state, [:workers], &{&1, Map.delete(&1, worker.name)})
+            Tgw.Db.Worker.mark_unavailable(worker)
+            {_, new_state} = get_and_update_in(state, [:workers], &{&1, Map.delete(&1, worker.name)})
+            new_state
           else
             state
           end

@@ -75,7 +75,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
     worker = %Tgw.Db.Worker{
       operator_id: 1,
       name: worker_name,
-      busy: true
+      status: 1,
     }
     worker =
       case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
@@ -96,7 +96,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
               version: _version, worker_class: _worker_class
             }}} ->
           with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
-          {:ok, _} <- Tgw.Repo.update(Tgw.Db.Worker.mark_ready(worker)) do
+          {:ok, _} <- Tgw.Db.Worker.mark_ready(worker) do
             Logger.info("worker #{worker.name} ready to work")
           else
             err ->
@@ -133,7 +133,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
 
           # Mark the worker as ready again
           with worker <- Tgw.Repo.get(Tgw.Db.Worker, worker.id),
-          {:ok, worker} <- Tgw.Repo.update(Tgw.Db.Worker.mark_ready(worker)) do
+          {:ok, worker} <- Tgw.Db.Worker.mark_ready(worker) do
             Logger.info("worker #{worker.name} ready to work again")
           else
             err ->
