@@ -3,12 +3,18 @@ defmodule Tgw.Lagrange.DARA do
   use GenServer
   import Ecto.Query
 
+  @dara_period 3_000
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: :DARA)
   end
 
   def debug() do
     GenServer.cast(:DARA, :debug)
+  end
+
+  def set_interval(interval) do
+    GenServer.cast(:DARA, {:set_interval, interval})
   end
 
   def insert_worker(name, stream), do: GenServer.call(:DARA, {:new_worker, name, stream})
@@ -30,8 +36,8 @@ defmodule Tgw.Lagrange.DARA do
 
     state =
       state
-      |> Map.put_new(:interval, 3_000)
-      |> Map.put_new(:schedule, schedule_work(3_000))
+      |> Map.put_new(:interval, @dara_period)
+      |> Map.put_new(:schedule, schedule_work(@dara_period))
       |> Map.put_new(:workers, %{})
 
     {:ok, state}
@@ -93,14 +99,6 @@ defmodule Tgw.Lagrange.DARA do
   def handle_info(_, state), do: {:noreply, state}
 
   @impl GenServer
-  def handle_cast(:debug, state) do
-    Logger.debug("===== DARA debugging =====")
-    IO.inspect(state)
-    {:noreply, state}
-  end
-
-
-  @impl GenServer
   def handle_call({:new_worker, worker, stream}, _, state) do
     case Tgw.Db.Worker.get_or_insert(worker) do
       {:ok, worker} ->
@@ -110,7 +108,17 @@ defmodule Tgw.Lagrange.DARA do
       {:error, _} ->
         Logger.error("failed to insert worker #{worker.name}")
     end
+  end
 
+
+  @impl GenServer
+  def handle_cast({:set_interval, interval}, state), do: {:noreply, Map.put(state, :interval, interval)}
+
+  @impl GenServer
+  def handle_cast(:debug, state) do
+    Logger.debug("===== DARA debugging =====")
+    IO.inspect(state)
+    {:noreply, state}
   end
 
   # ========== Private Implementation ==========
