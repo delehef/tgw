@@ -22,9 +22,9 @@ defmodule Tgw.Lagrange.DARA do
   @impl GenServer
   def init(state) do
     # Re-start a watcher for all the in-flight tasks
-    inflight_tasks = Tgw.Repo.all(from(t in Tgw.Db.Task, where: t.status == 1))
+    inflight_tasks = Tgw.Repo.all(from(t in Tgw.Db.Task, where: t.status == :sent))
     Enum.each(inflight_tasks, fn task ->
-      with job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, [task_id: task.id, status: 1]) do
+      with job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, [task_id: task.id, status: :pending]) do
         Logger.info("re-starting a monitor for task #{task.id}")
         spawn(fn -> Tgw.Db.Task.check_timeout(task, job.worker_id, false) end)
       else
@@ -57,10 +57,10 @@ defmodule Tgw.Lagrange.DARA do
       #
       # Then start a process monitoring that the tasks is done before its TTL.
       assign_to_worker = Ecto.Multi.new()
-      |> Ecto.Multi.update(:update_task, Ecto.Changeset.change(task, %{status: 1}))
-      |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{status: 2}))
-      |> Ecto.Multi.insert(:create_job, %Tgw.Db.Job{status: 1, task_id: task.id, worker_id: worker.id})
-      |> Ecto.Multi.run(:send_to_grpc, fn _, ongoing ->
+      |> Ecto.Multi.update(:update_task, Ecto.Changeset.change(task, %{status: :sent}))
+      |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{status: :working}))
+      |> Ecto.Multi.insert(:create_job, %Tgw.Db.Job{status: :pending, task_id: task.id, worker_id: worker.id})
+      |> Ecto.Multi.run(:send_to_grpc, fn _, _ongoing ->
         stream = Map.get(state.workers, worker.name)
         try do
           GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{

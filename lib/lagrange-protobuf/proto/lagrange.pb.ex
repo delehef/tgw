@@ -54,7 +54,7 @@ defmodule Lagrange.SubmitTaskRequest do
 
   field :task_bytes, 1, type: :bytes, json_name: "taskBytes"
   field :user_task_id, 2, type: :string, json_name: "userTaskId"
-  field :timeout, 3, type: Google.Protobuf.Timestamp
+  field :timeout, 3, type: Google.Protobuf.Duration
   field :price_requested, 4, type: :bytes, json_name: "priceRequested"
   field :class, 5, type: :string
 end
@@ -64,9 +64,6 @@ defmodule Lagrange.SubmitTaskResponse do
 
   use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
 
-  oneof :reply, 0
-
-  field :reply_string, 1, type: :string, json_name: "replyString", oneof: 0
   field :task_uuid, 2, type: Lagrange.UUID, json_name: "taskUuid"
 end
 

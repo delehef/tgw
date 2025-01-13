@@ -4,16 +4,24 @@ defmodule TgwWeb.Lagrange.ClientServer do
   alias Tgw.Repo
   import Ecto.Query
 
-  @spec submit_task(Lagrange.SubmitTaskRequest.t, GRPC.Server.Stream.t):: Lagrange.SubmitTaskResponse.t
-  def submit_task(request, _stream) do
-    Logger.info("new proof request: #{request.user_task_id}")
+  def submit_task(request, stream) do
+    headers = GRPC.Stream.get_headers(stream)
+    client_id = Map.get(headers, "client_id")
+    if is_nil(client_id) do
+      Logger.error("`client_id` not found in headers")
+      raise GRPC.RPCError, :unauthenticated
+    end
+
+    Logger.info("new proof request from #{client_id} for #{request.user_task_id}")
 
     task = %Tgw.Db.Task{
+      client_id: client_id,
       user_task_id: request.user_task_id,
       price_requested: 1500, # FIXME: need to parse int from bytes
       class: request.class,
       task: request.task_bytes,
       time_to_live: request.timeout.seconds,
+      status: :created
     }
 
     case Repo.insert(task) do
@@ -30,14 +38,19 @@ defmodule TgwWeb.Lagrange.ClientServer do
   end
 
   def proof_channel(request, stream) do
-    Tgw.Lagrange.Client.set_stream(stream)
-    # HACK
     headers = GRPC.Stream.get_headers(stream)
+    client_id = Map.get(headers, "client_id")
+    if is_nil(client_id) do
+      Logger.error("`client_id` not found in headers")
+      raise GRPC.RPCError, :unauthenticated
+    end
+    # HACK
     GRPC.Server.send_headers(stream, headers)
     # HACK
 
     # Re-send ready but non-acked proof on connection opening
-    Tgw.Lagrange.Client.send_ready()
+    Tgw.Lagrange.Client.new_client(client_id, stream)
+    Tgw.Lagrange.Client.send_ready(client_id)
 
 
     Enum.each(request, fn req ->
@@ -52,7 +65,7 @@ defmodule TgwWeb.Lagrange.ClientServer do
           Logger.info("updating acked proofs: #{inspect(ids)}")
           Tgw.Repo.update_all(
             from(t in Tgw.Db.Task, where: t.id in ^ids),
-            set: [acked_by_client: true]
+            set: [status: :returned]
           )
 
         _ ->
@@ -72,8 +85,8 @@ defmodule TgwWeb.Lagrange.WorkerServer do
     # HACK
 
     headers = GRPC.Stream.get_headers(stream)
-    # NOTE: This cannot failed, as it would have failed at authentication.
-    {:ok, token} = Tgw.Rpc.Authenticator.decode_token(headers)
+    # NOTE: This cannot fail, as it would have failed at authentication.
+    {:ok, _token} = Tgw.Rpc.Authenticator.decode_token(headers)
     {ip, port} = stream.adapter.get_peer(stream.payload)
     worker_name = inspect(ip) <> ":" <> inspect(port)
     Logger.info("worker #{worker_name} connected (#{inspect(headers)})")
@@ -81,7 +94,7 @@ defmodule TgwWeb.Lagrange.WorkerServer do
     worker = %Tgw.Db.Worker{
       operator_id: 1,
       name: worker_name,
-      status: 1,
+      status: :ready,
     }
     worker_id =
       case Tgw.Lagrange.DARA.insert_worker(worker, stream) do
@@ -127,9 +140,9 @@ defmodule TgwWeb.Lagrange.WorkerServer do
           with worker when not is_nil(worker) <- Tgw.Repo.get(Tgw.Db.Worker, worker_id),
           {:job, job} when not is_nil(job) <- {:job, Tgw.Repo.get_by(
             Tgw.Db.Job,
-            [task_id: uuid, worker_id: worker.id, status: 1])},
+            [task_id: uuid, worker_id: worker.id, status: :pending])},
           {:task, task} when not is_nil(task) <- {:task, Tgw.Repo.get(Tgw.Db.Task, uuid)},
-          {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload}) do
+          {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload, task_id: task.id}) do
             if Tgw.Db.Worker.has_timedout(worker) do
               Logger.warning("ignoring proof for task #{task.id} from timed-out worker #{worker.name}")
               Tgw.Db.Job.mark_timedout(job)

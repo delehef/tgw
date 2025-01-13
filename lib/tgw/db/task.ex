@@ -4,24 +4,16 @@ defmodule Tgw.Db.Task do
   import Ecto.Changeset
   import Ecto.Query
 
-  @task_timeout 60
-
-  @ready 0
-  @inflight 1
-  @successful 2
-  @failed 3
-
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
   schema "tasks" do
-    field :status, :integer
+    field :client_id, :string
     field :user_task_id, :string
     field :price_requested, :decimal
     field :class, :string
     field :task, :binary
-    field :ready_proof, :integer
     field :time_to_live, :integer
-    field :acked_by_client, :boolean, default: false
+    field :status, Ecto.Enum, values: [:created, :sent, :completed, :faulted, :errored, :returned]
 
     timestamps(type: :utc_datetime)
   end
@@ -29,23 +21,23 @@ defmodule Tgw.Db.Task do
   @doc false
   def changeset(task, attrs) do
     task
-    |> cast(attrs, [:status, :class, :user_task_id, :price_requested, :class, :task, :ready_proof, :acked_by_client, :time_to_live])
-    |> validate_required([:status, :class, :user_task_id, :price_requested, :class, :task, :acked_by_client, :time_to_live])
+    |> cast(attrs, [:client_id,  :user_task_id, :price_requested, :class, :task, :status,  :time_to_live])
+    |> validate_required([:client_id,  :user_task_id, :price_requested, :class, :task, :status,  :time_to_live])
   end
 
-  def mark_ready(task), do: Tgw.Repo.update(changeset(task, %{status: @ready}))
-  def mark_successful(task, proof_id), do: Tgw.Repo.update(changeset(task, %{status: @successful, ready_proof: proof_id}))
-  def mark_failed(task), do: Tgw.Repo.update(changeset(task, %{status: @failed}))
+  def mark_ready(task), do: Tgw.Repo.update(changeset(task, %{status: :created}))
+  def mark_successful(task, proof_id), do: Tgw.Repo.update(changeset(task, %{status: :completed, ready_proof: proof_id}))
+  def mark_faulted(task), do: Tgw.Repo.update(changeset(task, %{status: :faulted}))
 
-  def non_acked do
+  def ready_for(client_id) do
     q = from t in Tgw.Db.Task,
-      where: t.status == ^@successful and t.acked_by_client == false
+      where: t.status == :completed and t.client_id == ^client_id
     Tgw.Repo.all(q)
   end
 
   def query_to_process() do
     from t in Tgw.Db.Task,
-      where: t.status == ^@ready,
+      where: t.status == :created,
       order_by: [desc: t.price_requested]
   end
 
@@ -54,11 +46,23 @@ defmodule Tgw.Db.Task do
     Process.sleep(ttl_secs)
 
     task = Tgw.Repo.get!(Tgw.Db.Task, task.id)
-    if task.status == @inflight do
+    if task.status == :sent do
       Logger.warning("task #{task.id} timed out")
       mark_ready(task)
       worker = Tgw.Repo.get!(Tgw.Db.Worker, worker_id)
-      if penalize, do: Tgw.Db.Worker.mark_timedout(worker)
+      if penalize do
+        Logger.warning("penalizing worker")
+        Tgw.Db.Worker.mark_timedout(worker)
+      end
     end
+  end
+
+  def in_flight do
+    q = from t in Tgw.Db.Task,
+      where: t.status == :created,
+      select: %{id: t.id, user_id: t.user_task_id, status: t.status, class: t.class, created: t.inserted_at, updated: t.updated_at},
+      order_by: [asc: t.class, asc: t.inserted_at]
+
+    Tgw.Repo.all(q)
   end
 end

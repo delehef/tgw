@@ -3,12 +3,13 @@ defmodule Tgw.Repo.Migrations.CreateWorkers do
 
   def change do
     create table(:workers) do
+      add :operator_id, references(:operators, on_delete: :nothing)
       add :name, :string
-      add :status, :integer
+      add :status, :string
       add :score, :float
       add :average_speed, :float
       add :samples_size, :integer
-      add :operator_id, references(:operators, on_delete: :nothing)
+      add :timeouts, {:array, :utc_datetime}
 
       timestamps(type: :utc_datetime)
     end

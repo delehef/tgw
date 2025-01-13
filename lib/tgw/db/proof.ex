@@ -4,6 +4,7 @@ defmodule Tgw.Db.Proof do
 
   schema "proofs" do
     field :proof, :binary
+    field :task_id, :binary_id
 
     timestamps(type: :utc_datetime)
   end
@@ -11,7 +12,7 @@ defmodule Tgw.Db.Proof do
   @doc false
   def changeset(proof, attrs) do
     proof
-    |> cast(attrs, [:proof])
-    |> validate_required([:proof])
+    |> cast(attrs, [:proof, :task_id])
+    |> validate_required([:proof, :task_id])
   end
 end
