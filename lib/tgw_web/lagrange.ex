@@ -138,14 +138,11 @@ defmodule TgwWeb.Lagrange.WorkerServer do
 
           # Save the proof payload to the DB and broadcast its readiness
           with worker when not is_nil(worker) <- Tgw.Repo.get(Tgw.Db.Worker, worker_id),
-          {:job, job} when not is_nil(job) <- {:job, Tgw.Repo.get_by(
-            Tgw.Db.Job,
-            [task_id: uuid, worker_id: worker.id, status: :pending])},
+          {:job, job} when not is_nil(job) <- {:job, Tgw.Db.Job.latest_for(uuid, worker.id)},
           {:task, task} when not is_nil(task) <- {:task, Tgw.Repo.get(Tgw.Db.Task, uuid)},
           {:ok, proof} <- Tgw.Repo.insert(%Tgw.Db.Proof{proof: payload, task_id: task.id}) do
             if Tgw.Db.Worker.has_timedout(worker) do
               Logger.warning("ignoring proof for task #{task.id} from timed-out worker #{worker.name}")
-              Tgw.Db.Job.mark_timedout(job)
               Tgw.Db.Worker.un_timeout(worker)
             else
               # Mark the task and its associated job as ssuccesful
@@ -165,10 +162,10 @@ defmodule TgwWeb.Lagrange.WorkerServer do
               end
             end
           else
+            {:job, nil} ->
+              Logger.error("failed to find an in-flight job for task #{uuid} and worker #{worker.name}")
             {:task, nil} ->
               Logger.error("unknown task #{uuid}; ignoring proof")
-            {:job, nil} ->
-              Logger.error("failed to find a job for task #{uuid} and worker #{worker.name}")
             {:error, changeset} ->
               Logger.error("failed to update task with proof: #{inspect(changeset)}")
             msg -> Logger.error("unexpected error: #{inspect(msg)}")

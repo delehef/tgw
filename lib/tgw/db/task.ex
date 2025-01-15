@@ -50,6 +50,8 @@ defmodule Tgw.Db.Task do
       Logger.warning("task #{task.id} timed out")
       mark_ready(task)
       worker = Tgw.Repo.get!(Tgw.Db.Worker, worker_id)
+      job = Tgw.Db.Job.latest_for(task.id, worker_id)
+      Tgw.Db.Job.mark_timedout(job)
       if penalize do
         Tgw.Db.Worker.mark_timedout(worker)
       end

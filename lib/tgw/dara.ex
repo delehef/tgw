@@ -22,15 +22,14 @@ defmodule Tgw.Lagrange.DARA do
   @impl GenServer
   def init(state) do
     # Re-start a watcher for all the in-flight tasks
-    inflight_tasks = Tgw.Repo.all(from(t in Tgw.Db.Task, where: t.status == :sent))
-    Enum.each(inflight_tasks, fn task ->
-      with job when not is_nil(job) <- Tgw.Repo.get_by(Tgw.Db.Job, [task_id: task.id, status: :pending]) do
-        Logger.info("re-starting a monitor for task #{task.id}")
+    inflight_jobs = Tgw.Repo.all(from(j in Tgw.Db.Job, where: j.status == :pending))
+    Enum.each(inflight_jobs, fn job ->
+      with task when not is_nil(task) <- Tgw.Repo.get_by(Tgw.Db.Task, [id: job.task_id]) do
+        Logger.info("re-starting a monitor for task #{task.id} (#{task.time_to_live}s)")
         spawn(fn -> Tgw.Db.Task.check_timeout(task, job.worker_id, false) end)
       else
-        _ ->
-          Logger.warning("no job found for task #{task.id}; marking it as ready")
-          Tgw.Db.Task.mark_ready(task)
+        err ->
+          Logger.warning(err)
       end
     end)
 
