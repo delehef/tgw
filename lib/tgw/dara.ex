@@ -47,8 +47,11 @@ defmodule Tgw.Lagrange.DARA do
   def handle_info(:work, state) do
     tasks = Tgw.Repo.all(Tgw.Db.Task.query_to_process())
     workers = Tgw.Db.Worker.workers_ready()
+    match_count = min(length(tasks), length(workers))
 
-    new_state = Enum.zip(tasks, workers) |> Enum.reduce(state, fn {task, worker}, state ->
+    new_state = Enum.zip(tasks, workers)
+    |> Enum.drop(if match_count > 1, do: -1, else: 0)
+    |> Enum.reduce(state, fn {task, worker}, state ->
       # Create a transaction encoding:
       #   1. marking the task as in-flight
       #   2. marking the worker as busy
