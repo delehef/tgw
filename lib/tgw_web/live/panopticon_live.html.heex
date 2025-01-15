@@ -46,6 +46,7 @@
   <thead class="border border-slate-500 bg-indigo-700 text-white text-left">
     <tr>
       <th class="p-2">ID</th>
+      <th class="p-2">From</th>
       <th class="p-2">User ID</th>
       <th class="p-2">Status</th>
       <th class="p-2">Class</th>
@@ -57,6 +58,7 @@
     <%= for t <- @tasks do %>
         <tr class="odd:bg-gray-100">
           <td class="p-2"><%= t.id %></td>
+          <td class="p-2"><%= t.client_id %></td>
           <td class="p-2"><%= t.user_id %></td>
           <td class="p-2"><%= t.status %></td>
           <td class="p-2"><%= t.class %></td>

@@ -59,7 +59,7 @@ defmodule Tgw.Db.Task do
   def in_flight do
     q = from t in Tgw.Db.Task,
       where: t.status == :created,
-      select: %{id: t.id, user_id: t.user_task_id, status: t.status, class: t.class, created: t.inserted_at, updated: t.updated_at},
+      select: %{id: t.id, client_id: t.client_id, user_id: t.user_task_id, status: t.status, class: t.class, created: t.inserted_at, updated: t.updated_at},
       order_by: [asc: t.class, asc: t.inserted_at]
 
     Tgw.Repo.all(q)
