@@ -2,7 +2,7 @@
   <div class="flex items-center justify-between border-b border-zinc-100 py-3 text-sm">
     <div class="flex items-center gap-4">
       <p class="bg-brand/5 text-brand rounded-full px-2 font-medium leading-6">
-        v<%= Application.spec(:phoenix, :vsn) %>
+        v{Application.spec(:phoenix, :vsn)}
       </p>
       <a href="/">Home</a>
       <a href="/panopticon">Panopticon</a>
@@ -13,6 +13,6 @@
 <main class="px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto">
     <.flash_group flash={@flash} />
-    <%= @inner_content %>
+    {@inner_content}
   </div>
 </main>

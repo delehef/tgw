@@ -24,11 +24,13 @@ defmodule Tgw.Lagrange.Client do
 
   @impl GenServer
   def handle_cast({:send_ready, client_id}, state) do
-    new_state = Tgw.Db.Task.ready_for(client_id) |> Enum.reduce(state, fn task, curr_state ->
-      proof = Tgw.Repo.get_by!(Tgw.Db.Proof, task_id: task.id)
-      Logger.info("sending pre-existing proof for #{inspect(task.id)} to #{client_id}")
-      send_proof(curr_state, proof)
-    end)
+    new_state =
+      Tgw.Db.Task.ready_for(client_id)
+      |> Enum.reduce(state, fn task, curr_state ->
+        proof = Tgw.Repo.get_by!(Tgw.Db.Proof, task_id: task.id)
+        Logger.info("sending pre-existing proof for #{inspect(task.id)} to #{client_id}")
+        send_proof(curr_state, proof)
+      end)
 
     {:noreply, new_state}
   end
@@ -48,25 +50,29 @@ defmodule Tgw.Lagrange.Client do
   defp send_proof(state, proof) do
     task = Tgw.Repo.get_by!(Tgw.Db.Task, id: proof.task_id)
     client_id = task.client_id
+
     proof_ready = %Lagrange.ProofReady{
       task_id: %Lagrange.UUID{id: task.id},
       task_output: proof.proof
     }
+
     response = %Lagrange.ProofChannelResponse{response: {:proof, proof_ready}}
 
-    new_state = with stream when not is_nil(stream) <- Map.get(state.streams, client_id),
-                     :ok <- send_to_stream(stream, response) do
-                  Logger.info("new proof for user #{client_id} sent for proof #{inspect(task.id)}")
-                  state
-                else
-                  nil ->
-                    Logger.warning("client #{client_id} unknown")
-                    state
-                {:error, err} ->
-                    Logger.warning("client #{client_id} disconnected: #{err}")
-                    {_, new_state} = get_and_update_in(state, [:streams], &{&1, Map.delete(&1, client_id)})
-                    new_state
-                end
+    new_state =
+      with stream when not is_nil(stream) <- Map.get(state.streams, client_id),
+           :ok <- send_to_stream(stream, response) do
+        Logger.info("new proof for user #{client_id} sent for proof #{inspect(task.id)}")
+        state
+      else
+        nil ->
+          Logger.warning("client #{client_id} unknown")
+          state
+
+        {:error, err} ->
+          Logger.warning("client #{client_id} disconnected: #{err}")
+          {_, new_state} = get_and_update_in(state, [:streams], &{&1, Map.delete(&1, client_id)})
+          new_state
+      end
 
     new_state
   end

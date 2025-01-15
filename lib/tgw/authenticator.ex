@@ -3,9 +3,11 @@ defmodule Tgw.Rpc.Authenticator do
   def init(_), do: []
 
   def decode_token(headers) do
-    with {:has_token, bearer_str} when not is_nil(bearer_str) <- {:has_token, Map.get(headers, "authorization")},
+    with {:has_token, bearer_str} when not is_nil(bearer_str) <-
+           {:has_token, Map.get(headers, "authorization")},
          token_str <- Enum.at(String.split(bearer_str, " "), 1),
-         {:decode_token, {:ok, token_json}} <- {:decode_token, Base.decode64(token_str, padding: false, ignore: :whitespace)},
+         {:decode_token, {:ok, token_json}} <-
+           {:decode_token, Base.decode64(token_str, padding: false, ignore: :whitespace)},
          {:ok, token} <- Jason.decode(token_json) do
       {:ok, token}
     else
@@ -34,7 +36,7 @@ defmodule Tgw.Rpc.Authenticator do
 
       msg ->
         Logger.error("failed to decode authentication info: #{msg}")
-      raise GRPC.RPCError, status: :permission_denied
+        raise GRPC.RPCError, status: :permission_denied
     end
   end
 end

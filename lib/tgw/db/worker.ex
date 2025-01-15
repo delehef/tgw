@@ -19,7 +19,15 @@ defmodule Tgw.Db.Worker do
   @doc false
   def changeset(worker, attrs) do
     worker
-    |> cast(attrs, [:name, :score, :average_speed, :samples_size, :operator_id, :status, :timeouts])
+    |> cast(attrs, [
+      :name,
+      :score,
+      :average_speed,
+      :samples_size,
+      :operator_id,
+      :status,
+      :timeouts
+    ])
     |> validate_required([:name, :score, :average_speed, :samples_size, :operator_id, :status])
     |> unique_constraint(:unique_name, name: :unique_name)
   end
@@ -31,12 +39,15 @@ defmodule Tgw.Db.Worker do
   def mark_ready(worker), do: Tgw.Repo.update(changeset(worker, %{status: :ready}))
   def mark_unavailable(worker), do: Tgw.Repo.update(changeset(worker, %{status: :gone}))
   def mark_working(worker), do: Tgw.Repo.update(changeset(worker, %{status: :working}))
+
   def mark_timedout(worker) do
     Tgw.Repo.update!(
       changeset(worker, %{
-            status: :timedout,
-            score: worker.score - 1,
-            timeouts: [DateTime.now!("Etc/UTC") | worker.timeouts]}))
+        status: :timedout,
+        score: worker.score - 1,
+        timeouts: [DateTime.now!("Etc/UTC") | worker.timeouts]
+      })
+    )
   end
 
   def un_timeout(worker) do

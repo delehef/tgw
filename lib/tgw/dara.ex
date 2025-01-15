@@ -23,8 +23,9 @@ defmodule Tgw.Lagrange.DARA do
   def init(state) do
     # Re-start a watcher for all the in-flight tasks
     inflight_jobs = Tgw.Repo.all(from(j in Tgw.Db.Job, where: j.status == :pending))
+
     Enum.each(inflight_jobs, fn job ->
-      with task when not is_nil(task) <- Tgw.Repo.get_by(Tgw.Db.Task, [id: job.task_id]) do
+      with task when not is_nil(task) <- Tgw.Repo.get_by(Tgw.Db.Task, id: job.task_id) do
         Logger.info("re-starting a monitor for task #{task.id} (#{task.time_to_live}s)")
         spawn(fn -> Tgw.Db.Task.check_timeout(task, job.worker_id, false) end)
       else
@@ -48,50 +49,64 @@ defmodule Tgw.Lagrange.DARA do
     workers = Tgw.Db.Worker.workers_ready()
     match_count = min(length(tasks), length(workers))
 
-    new_state = Enum.zip(tasks, workers)
-    |> Enum.drop(if match_count > 1, do: -1, else: 0)
-    |> Enum.reduce(state, fn {task, worker}, state ->
-      # Create a transaction encoding:
-      #   1. marking the task as in-flight
-      #   2. marking the worker as busy
-      #   3. creating a new job linking the task and the worker
-      #   4. sending the task over gRPC to the worker.
-      #
-      # Then start a process monitoring that the tasks is done before its TTL.
-      assign_to_worker = Ecto.Multi.new()
-      |> Ecto.Multi.update(:update_task, Ecto.Changeset.change(task, %{status: :sent}))
-      |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{status: :working}))
-      |> Ecto.Multi.insert(:create_job, %Tgw.Db.Job{status: :pending, task_id: task.id, worker_id: worker.id})
-      |> Ecto.Multi.run(:send_to_grpc, fn _, _ongoing ->
-        stream = Map.get(state.workers, worker.name)
-        try do
-          GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{
+    new_state =
+      Enum.zip(tasks, workers)
+      |> Enum.drop(if match_count > 1, do: -1, else: 0)
+      |> Enum.reduce(state, fn {task, worker}, state ->
+        # Create a transaction encoding:
+        #   1. marking the task as in-flight
+        #   2. marking the worker as busy
+        #   3. creating a new job linking the task and the worker
+        #   4. sending the task over gRPC to the worker.
+        #
+        # Then start a process monitoring that the tasks is done before its TTL.
+        assign_to_worker =
+          Ecto.Multi.new()
+          |> Ecto.Multi.update(:update_task, Ecto.Changeset.change(task, %{status: :sent}))
+          |> Ecto.Multi.update(:update_worker, Ecto.Changeset.change(worker, %{status: :working}))
+          |> Ecto.Multi.insert(:create_job, %Tgw.Db.Job{
+            status: :pending,
+            task_id: task.id,
+            worker_id: worker.id
+          })
+          |> Ecto.Multi.run(:send_to_grpc, fn _, _ongoing ->
+            stream = Map.get(state.workers, worker.name)
+
+            try do
+              GRPC.Server.send_reply(stream, %Lagrange.WorkerToGwResponse{
                 task_id: %Lagrange.UUID{id: task.id},
-                task: task.task})
-          spawn(fn -> Tgw.Db.Task.check_timeout(task, worker.id, true) end)
-          {:ok, {}}
-        rescue
-          _ -> {:error, "failed to send to stream"}
+                task: task.task
+              })
+
+              spawn(fn -> Tgw.Db.Task.check_timeout(task, worker.id, true) end)
+              {:ok, {}}
+            rescue
+              _ -> {:error, "failed to send to stream"}
+            end
+          end)
+          |> Tgw.Repo.transaction()
+
+        case assign_to_worker do
+          {:error, stage, value, _} ->
+            Logger.error("failed to create job at stage #{stage}: #{value}")
+
+            if stage == :send_to_grpc do
+              Logger.warning("sending to gRPC failed; removing worker")
+              Tgw.Db.Worker.mark_unavailable(worker)
+
+              {_, new_state} =
+                get_and_update_in(state, [:workers], &{&1, Map.delete(&1, worker.name)})
+
+              new_state
+            else
+              state
+            end
+
+          _ ->
+            Logger.info("assigning #{inspect(task.id)} to #{worker.name}")
+            state
         end
       end)
-      |> Tgw.Repo.transaction()
-
-      case assign_to_worker do
-        {:error, stage, value, _} ->
-          Logger.error("failed to create job at stage #{stage}: #{value}")
-          if stage == :send_to_grpc do
-            Logger.warning("sending to gRPC failed; removing worker")
-            Tgw.Db.Worker.mark_unavailable(worker)
-            {_, new_state} = get_and_update_in(state, [:workers], &{&1, Map.delete(&1, worker.name)})
-            new_state
-          else
-            state
-          end
-        _ ->
-          Logger.info("assigning #{inspect(task.id)} to #{worker.name}")
-          state
-      end
-    end)
 
     {:noreply, Map.put(new_state, :schedule, schedule_work(state.interval))}
   end
@@ -112,9 +127,9 @@ defmodule Tgw.Lagrange.DARA do
     end
   end
 
-
   @impl GenServer
-  def handle_cast({:set_interval, interval}, state), do: {:noreply, Map.put(state, :interval, interval)}
+  def handle_cast({:set_interval, interval}, state),
+    do: {:noreply, Map.put(state, :interval, interval)}
 
   @impl GenServer
   def handle_cast(:debug, state) do

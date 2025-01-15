@@ -3,6 +3,7 @@ defmodule TgwWeb.PanopticonLive do
 
   def mount(_params, _session, socket) do
     Phoenix.PubSub.subscribe(Tgw.PubSub, "status_updates")
+
     {
       :ok,
       socket

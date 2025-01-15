@@ -10,14 +10,16 @@
   </thead>
   <tbody>
     <%= for w <- @workers do %>
-        <tr>
-          <td class="p-2"><%= w.name %></td>
-          <td class="p-2"><%= w.status %></td>
-          <td class="p-2"><%= w.score %></td>
-          <td class="p-2"><%= w.timeouts
-                              |> Enum.map(&Timex.format!(&1, "{relative}", :relative))
-                              |> Enum.join(", ") %></td>
-        </tr>
-        <% end %>
+      <tr>
+        <td class="p-2">{w.name}</td>
+        <td class="p-2">{w.status}</td>
+        <td class="p-2">{w.score}</td>
+        <td class="p-2">
+          {w.timeouts
+          |> Enum.map(&Timex.format!(&1, "{relative}", :relative))
+          |> Enum.join(", ")}
+        </td>
+      </tr>
+    <% end %>
   </tbody>
 </table>
