@@ -51,7 +51,6 @@ defmodule Tgw.Db.Task do
       mark_ready(task)
       worker = Tgw.Repo.get!(Tgw.Db.Worker, worker_id)
       if penalize do
-        Logger.warning("penalizing worker")
         Tgw.Db.Worker.mark_timedout(worker)
       end
     end

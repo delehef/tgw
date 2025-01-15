@@ -6,4 +6,8 @@ defmodule TgwWeb.PageController do
     # so skip the default app layout.
     render(conn, :home, layout: false)
   end
+
+  def workers(conn, _) do
+    render(conn, :workers, workers: Tgw.Db.Worker.list())
+  end
 end

@@ -18,6 +18,8 @@ defmodule TgwWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/workers", PageController, :workers
+    live "/panopticon", PanopticonLive
   end
 
   # Other scopes may use custom stacks.

@@ -55,4 +55,6 @@ defmodule Tgw.Db.Worker do
       conflict_target: [:operator_id, :name]
     )
   end
+
+  def list, do: Tgw.Repo.all(Tgw.Db.Worker)
 end

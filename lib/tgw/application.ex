@@ -17,6 +17,8 @@ defmodule Tgw.Application do
       # Start a worker by calling: Tgw.Worker.start_link(arg)
       # {Tgw.Worker, arg},
       # Start to serve requests, typically the last entry
+
+      Tgw.Pglistener,
       TgwWeb.Endpoint,
       {GRPC.Server.Supervisor, endpoint: TgwWeb.Endpoint, port: 9000, start_server: true},
       {Tgw.Lagrange.DARA, []},

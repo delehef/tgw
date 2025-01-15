@@ -1,0 +1,68 @@
+<h2 class="text-2xl font-bold tracking-tight">In-Flight Jobs</h2>
+<table class="border-collapse border border-slate-500">
+  <thead class="border border-slate-500 bg-lime-600 text-white text-left">
+    <tr>
+      <th class="p-2">Task ID</th>
+      <th class="p-2">User Task ID</th>
+      <th class="p-2">Worker</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= for j <- @in_flight do %>
+        <tr>
+          <td class="p-2"><%= j.task_id %></td>
+          <td class="p-2"><%= j.user_task_id %></td>
+          <td class="p-2"><%= j.worker %></td>
+        </tr>
+        <% end %>
+  </tbody>
+</table>
+
+<h2 class="text-2xl font-bold tracking-tight mt-8">Failed Jobs</h2>
+<table class="border-collapse border border-slate-500">
+  <thead class="border border-slate-500 bg-red-900 text-white text-left">
+    <tr>
+      <th class="p-2">Task ID</th>
+      <th class="p-2">User Task ID</th>
+      <th class="p-2">Worker</th>
+      <th class="p-2">Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= for j <- @failed do %>
+        <tr>
+          <td class="p-2"><%= j.task_id %></td>
+          <td class="p-2"><%= j.user_task_id %></td>
+          <td class="p-2"><%= j.worker %></td>
+          <td class="p-2"><%= j.error %></td>
+        </tr>
+        <% end %>
+  </tbody>
+</table>
+
+
+<h2 class="text-2xl font-bold tracking-tight mt-8">Active Tasks</h2>
+<table class="border-collapse border border-slate-500">
+  <thead class="border border-slate-500 bg-indigo-700 text-white text-left">
+    <tr>
+      <th class="p-2">ID</th>
+      <th class="p-2">User ID</th>
+      <th class="p-2">Status</th>
+      <th class="p-2">Class</th>
+      <th class="p-2">Created</th>
+      <th class="p-2">Last Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= for t <- @tasks do %>
+        <tr class="odd:bg-gray-100">
+          <td class="p-2"><%= t.id %></td>
+          <td class="p-2"><%= t.user_id %></td>
+          <td class="p-2"><%= t.status %></td>
+          <td class="p-2"><%= t.class %></td>
+          <td class="p-2"><%= Timex.format!(t.created, "{relative}", :relative) %></td>
+          <td class="p-2"><%= Timex.format!(t.updated, "{relative}", :relative) %></td>
+        </tr>
+        <% end %>
+  </tbody>
+</table>

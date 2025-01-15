@@ -61,7 +61,8 @@ defmodule Tgw.MixProject do
       {:bandit, "~> 1.5"},
       {:protobuf, "~> 0.13.0"},
       {:grpc, "~> 0.9"},
-      {:google_protos, "~> 0.4.0"}
+      {:google_protos, "~> 0.4.0"},
+      {:timex, "~> 3.7"}
     ]
   end
 
